@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>D.N.S. — TACTICAL SURVIVAL HORROR</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #000;
+        overflow: hidden;
+        font-family: 'Courier New', Courier, monospace;
+        color: #00ff41;
+        user-select: none;
+      }
+      #app { width: 100vw; height: 100vh; position: relative; }
+      canvas { display: block; width: 100% !important; height: 100% !important; }
+
+      /* ===== OVERLAY DE INICIO ===== */
+      #start-screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at center, #070d09 0%, #000000 85%);
+        z-index: 100;
+        gap: 16px;
+        padding: 20px;
+        text-align: center;
+      }
+      #start-screen h1 {
+        font-size: 4.8rem;
+        letter-spacing: 1.4rem;
+        color: #00ff41;
+        text-shadow: 0 0 25px #00ff41, 0 0 70px #00ff4180;
+        animation: flicker 4s infinite;
+        margin-bottom: 2px;
+      }
+      #start-screen .subtitle {
+        font-size: 0.85rem;
+        letter-spacing: 0.45rem;
+        color: #00cc33;
+        opacity: 0.85;
+      }
+      #start-screen .directive {
+        margin-top: 10px;
+        border: 1px solid #00ff4140;
+        background: rgba(0, 255, 65, 0.03);
+        padding: 14px 28px;
+        font-size: 0.72rem;
+        color: #00ff41aa;
+        text-align: center;
+        line-height: 1.9;
+        max-width: 620px;
+      }
+
+      /* Modos de Juego */
+      .mode-select-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 15px;
+        width: 380px;
+      }
+      .game-btn {
+        background: rgba(0, 255, 65, 0.05);
+        border: 1px solid #00ff41;
+        color: #00ff41;
+        font-family: 'Courier New', monospace;
+        font-size: 0.95rem;
+        letter-spacing: 0.2rem;
+        padding: 14px 20px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: all 0.2s;
+        text-align: center;
+      }
+      .game-btn:hover:not(:disabled) {
+        background: #00ff4125;
+        box-shadow: 0 0 20px #00ff4180;
+        transform: translateY(-2px);
+      }
+      .game-btn:disabled, .mode-btn-disabled {
+        opacity: 0.45;
+        border-color: #335533 !important;
+        color: #557755 !important;
+        cursor: not-allowed !important;
+        background: rgba(10, 20, 10, 0.5) !important;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+      .mode-badge {
+        font-size: 0.58rem;
+        color: #ffaa00;
+        display: block;
+        letter-spacing: 0.12rem;
+        margin-top: 4px;
+      }
+
+      #controls-info {
+        margin-top: 10px;
+        font-size: 0.68rem;
+        color: #00ff4170;
+        text-align: center;
+        line-height: 1.8;
+        letter-spacing: 0.12rem;
+      }
+
+      /* ===== HUD TÁCTICO ===== */
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        display: none;
+        z-index: 10;
+      }
+
+      /* Scanlines */
+      #hud::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(0,0,0,0.08) 2px,
+          rgba(0,0,0,0.08) 4px
+        );
+        pointer-events: none;
+        z-index: 20;
+      }
+
+      /* Marco visor */
+      .visor-corner {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border-color: #00ff41;
+        border-style: solid;
+        opacity: 0.7;
+      }
+      .visor-corner.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; }
+      .visor-corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; }
+      .visor-corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; }
+      .visor-corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; }
+
+      /* Mirilla central */
+      .crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 22px;
+        height: 22px;
+      }
+      .crosshair::before, .crosshair::after {
+        content: '';
+        position: absolute;
+        background: #00ff41;
+        opacity: 0.85;
+      }
+      .crosshair::before { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+      .crosshair::after  { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
+
+      /* Hitmarker indicator */
+      #hitmarker {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 32px;
+        height: 32px;
+        border: 2px solid #ff2222;
+        border-radius: 50%;
+        opacity: 0;
+        transition: opacity 0.08s ease;
+        pointer-events: none;
+      }
+      #hitmarker.active {
+        opacity: 1;
+        box-shadow: 0 0 12px #ff2222;
+      }
+
+      /* Panel info superior */
+      #hud-top {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        font-size: 0.7rem;
+        letter-spacing: 0.2rem;
+        color: #00ff4190;
+      }
+      #hud-top .sys-id { font-size: 0.6rem; opacity: 0.6; margin-bottom: 4px; }
+      #hud-top .objective {
+        color: #00ff41;
+        font-size: 0.85rem;
+        letter-spacing: 0.35rem;
+        animation: blink-green 1.5s step-end infinite;
+      }
+      #hud-subinfo {
+        font-size: 0.72rem;
+        color: #ffaa00;
+        letter-spacing: 0.25rem;
+        margin-top: 4px;
+      }
+
+      /* Brújula */
+      #compass {
+        position: absolute;
+        top: 20px;
+        right: 90px;
+        width: 160px;
+        text-align: center;
+      }
+      #compass .compass-bar {
+        font-size: 0.7rem;
+        letter-spacing: 0.15rem;
+        color: #00ff4180;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      #compass .compass-dir {
+        font-size: 0.9rem;
+        color: #00ff41;
+        letter-spacing: 0.4rem;
+      }
+      #compass-needle { display: inline-block; font-size: 1rem; }
+
+      /* Selector de Armas (1, 2, 3) centrado abajo */
+      #weapon-selector {
+        position: absolute;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 12;
+      }
+      .weapon-slot {
+        background: rgba(0, 20, 10, 0.65);
+        border: 1px solid #00ff4140;
+        padding: 5px 12px;
+        font-size: 0.62rem;
+        letter-spacing: 0.15rem;
+        color: #00ff4170;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+      }
+      .weapon-slot.active {
+        border-color: #00ff41;
+        background: rgba(0, 255, 65, 0.2);
+        color: #00ff41;
+        box-shadow: 0 0 10px rgba(0, 255, 65, 0.45);
+      }
+      .slot-num {
+        background: #00ff4130;
+        padding: 2px 5px;
+        border-radius: 2px;
+        font-weight: bold;
+      }
+      .weapon-slot.active .slot-num {
+        background: #00ff41;
+        color: #000;
+      }
+
+      /* Panel munición táctico (esquina inferior derecha) */
+      #ammo-panel {
+        position: absolute;
+        bottom: 24px;
+        right: 24px;
+        text-align: right;
+        background: rgba(2, 16, 8, 0.82);
+        border: 1px solid #00ff4150;
+        border-right: 3px solid #00ff41;
+        padding: 7px 16px;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 0 16px rgba(0, 255, 65, 0.12);
+        pointer-events: none;
+        z-index: 12;
+      }
+      #ammo-panel .ammo-label {
+        font-size: 0.55rem;
+        letter-spacing: 0.3rem;
+        color: #00ff4160;
+        margin-bottom: 4px;
+      }
+      #ammo-count {
+        font-size: 2.5rem;
+        color: #00ff41;
+        text-shadow: 0 0 10px #00ff41;
+        letter-spacing: 0.1rem;
+      }
+      #ammo-reserve {
+        font-size: 0.9rem;
+        color: #00ff4180;
+        margin-left: 8px;
+      }
+      #ammo-panel .ammo-mode {
+        font-size: 0.55rem;
+        letter-spacing: 0.2rem;
+        color: #00ff4160;
+        margin-top: 2px;
+      }
+      #reload-msg {
+        font-size: 0.65rem;
+        color: #ffaa00;
+        letter-spacing: 0.2rem;
+        animation: blink-amber 0.5s step-end infinite;
+        display: none;
+        margin-top: 4px;
+      }
+
+      /* ===== PANEL INTEGRADO DE BIOMETRÍA Y ESTADO DEL OPERADOR ===== */
+      #operator-vitals-card {
+        position: absolute;
+        bottom: 24px;
+        left: 24px;
+        width: 250px;
+        background: rgba(2, 16, 8, 0.82);
+        border: 1px solid #00ff4150;
+        border-left: 3px solid #00ff41;
+        padding: 9px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 0 16px rgba(0, 255, 65, 0.12);
+        pointer-events: none;
+        z-index: 12;
+      }
+      .vitals-header {
+        font-size: 0.52rem;
+        letter-spacing: 0.22rem;
+        color: #00ff4190;
+        margin-bottom: 1px;
+      }
+      .vital-row {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .vital-label-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.58rem;
+        letter-spacing: 0.12rem;
+      }
+      .vital-name {
+        color: #00ff41aa;
+      }
+      .health-bar-container {
+        width: 100%;
+        height: 11px;
+        background: rgba(0, 20, 5, 0.7);
+        border: 1px solid #00ff4180;
+        padding: 1px;
+        display: flex;
+      }
+      #health-bar-fill {
+        width: 100%;
+        height: 100%;
+        background: #00ff41;
+        box-shadow: 0 0 10px #00ff41;
+        transition: width 0.15s ease, background 0.2s ease;
+      }
+      #health-value {
+        font-size: 0.76rem;
+        color: #00ff41;
+        font-weight: bold;
+      }
+      .shield-bar-container {
+        width: 100%;
+        height: 8px;
+        background: rgba(0, 25, 45, 0.6);
+        border: 1px solid #22aaff60;
+        padding: 1px;
+        display: flex;
+      }
+      #shield-bar-fill {
+        width: 100%;
+        height: 100%;
+        background: #22aaff;
+        box-shadow: 0 0 10px #22aaff;
+        transition: width 0.15s ease;
+      }
+      #shield-value {
+        font-size: 0.64rem;
+        color: #22aaff;
+        font-weight: bold;
+      }
+      .vitals-subgrid {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2px;
+        padding-top: 4px;
+        border-top: 1px solid #00ff4125;
+        font-size: 0.58rem;
+        letter-spacing: 0.1rem;
+        color: #00ff4180;
+      }
+      .vitals-subgrid span {
+        color: #00ff41;
+      }
+      #flashlight-indicator.on  { color: #ffffaa; }
+      #flashlight-indicator.off { color: #00ff4140; }
+
+      /* Prompt de interacción táctica (Puertas, etc.) */
+      #door-prompt {
+        position: absolute;
+        bottom: 115px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        background: rgba(0, 18, 9, 0.88);
+        border: 1px solid #00ff41;
+        color: #00ff41;
+        padding: 7px 18px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.82rem;
+        letter-spacing: 0.16rem;
+        text-shadow: 0 0 8px #00ff41;
+        box-shadow: 0 0 16px rgba(0, 255, 65, 0.3);
+        pointer-events: none;
+        z-index: 25;
+      }
+
+      /* Alerta de impacto / Kill Alert */
+      #kill-alert {
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        text-align: center;
+        z-index: 15;
+      }
+      #kill-alert .alert-text {
+        font-size: 1.3rem;
+        color: #ff3300;
+        letter-spacing: 0.4rem;
+        text-shadow: 0 0 20px #ff3300;
+        animation: flicker 0.3s infinite;
+      }
+      #kill-alert.headshot .alert-text {
+        color: #ffcc00;
+        text-shadow: 0 0 25px #ffcc00;
+      }
+
+      /* Vignette */
+      #vignette {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at center, transparent 48%, rgba(0,0,0,0.85) 100%);
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      /* Efecto de dolor / sangre en pantalla */
+      #glitch-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255,0,0,0);
+        transition: background 0.08s;
+        pointer-events: none;
+        z-index: 8;
+      }
+
+      /* Modales: Pausa, Oleada, Game Over */
+      #pause-screen, #wave-modal, #gameover-modal {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.9);
+        backdrop-filter: blur(5px);
+        z-index: 50;
+        gap: 16px;
+        text-align: center;
+        padding: 20px;
+      }
+      #pause-screen h2, #wave-modal h2, #gameover-modal h2 {
+        font-size: 2.5rem;
+        letter-spacing: 0.8rem;
+        color: #00ff41;
+        text-shadow: 0 0 25px #00ff41;
+      }
+      .pause-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 15px;
+        width: 320px;
+      }
+      .pause-btn {
+        background: rgba(0, 255, 65, 0.05);
+        border: 1px solid #00ff41;
+        color: #00ff41;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        letter-spacing: 0.25rem;
+        padding: 13px 24px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: all 0.2s;
+        text-align: center;
+      }
+      .pause-btn:hover {
+        background: #00ff4125;
+        box-shadow: 0 0 15px #00ff4180;
+      }
+      .pause-btn.danger {
+        border-color: #ff3300;
+        color: #ff3300;
+      }
+      .pause-btn.danger:hover {
+        background: #ff330025;
+        box-shadow: 0 0 15px #ff330080;
+      }
+
+      /* Tabla de Estadísticas de Combate */
+      #wave-stats-box {
+        background: rgba(0, 25, 10, 0.7);
+        border: 1px solid #00ff4160;
+        padding: 16px 24px;
+        width: 100%;
+        max-width: 480px;
+        margin: 10px 0;
+        text-align: left;
+      }
+      .stats-title {
+        font-size: 0.75rem;
+        letter-spacing: 0.25rem;
+        color: #00ff4190;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #00ff4130;
+        padding-bottom: 4px;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 16px;
+      }
+      .stat-item {
+        font-size: 0.7rem;
+        letter-spacing: 0.12rem;
+        display: flex;
+        justify-content: space-between;
+      }
+      .stat-lbl { color: #00ff4180; }
+      .stat-val { color: #00ff41; font-weight: bold; }
+
+      /* Animaciones */
+      @keyframes flicker {
+        0%, 95%, 100% { opacity: 1; }
+        96% { opacity: 0.4; }
+        97% { opacity: 1; }
+        98% { opacity: 0.6; }
+        99% { opacity: 1; }
+      }
+      @keyframes blink-green {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+      @keyframes blink-amber {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      #fps-counter {
+        position: fixed;
+        bottom: 14px;
+        right: 14px;
+        background: rgba(0, 18, 10, 0.90);
+        border: 1px solid #00ff4170;
+        color: #00ff41;
+        font-family: 'Courier New', monospace;
+        font-size: 0.72rem;
+        padding: 5px 12px;
+        letter-spacing: 0.12rem;
+        z-index: 999;
+        pointer-events: none;
+        box-shadow: 0 0 12px rgba(0, 255, 65, 0.25);
+      }
+
+      /* Filtro Retro PS1 */
+      #ps1-dither-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 50;
+        background: radial-gradient(circle, transparent 65%, rgba(0, 0, 0, 0.42) 100%),
+                    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 1px, transparent 1px, transparent 2px);
+        mix-blend-mode: overlay;
+      }
+
+      /* Controles Táctiles Móviles */
+      #touch-controls {
+        position: fixed;
+        inset: 0;
+        z-index: 85;
+        pointer-events: none;
+        display: none;
+      }
+      #touch-zone-move {
+        position: absolute;
+        left: 20px;
+        bottom: 125px;
+        width: 140px;
+        height: 140px;
+        pointer-events: auto;
+        border-radius: 50%;
+        background: rgba(0, 255, 65, 0.04);
+        border: 1px dashed rgba(0, 255, 65, 0.25);
+      }
+      #touch-zone-look {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      #touch-joystick-base {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: rgba(0, 255, 65, 0.08);
+        border: 2px dashed rgba(0, 255, 65, 0.4);
+        display: none;
+        pointer-events: none;
+      }
+      #touch-joystick-knob {
+        position: absolute;
+        top: 30px;
+        left: 30px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: rgba(0, 255, 65, 0.4);
+        border: 2px solid #00ff41;
+        box-shadow: 0 0 10px #00ff41;
+      }
+      .touch-btn {
+        position: absolute;
+        pointer-events: auto;
+        border: 1px solid rgba(0, 255, 65, 0.5);
+        background: rgba(0, 20, 10, 0.65);
+        color: #00ff41;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        touch-action: manipulation;
+        border-radius: 4px;
+        box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+      }
+      .touch-btn:active, .touch-btn.active {
+        background: rgba(0, 255, 65, 0.35);
+        border-color: #00ff41;
+        box-shadow: 0 0 16px #00ff41;
+      }
+      /* Botones táctiles elevados para no sobreponerse con balas/munición */
+      #touch-btn-fire {
+        right: 24px;
+        bottom: 155px;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: rgba(255, 30, 40, 0.28);
+        border: 2px solid #ff3344;
+        color: #ff3344;
+        font-size: 0.90rem;
+      }
+      #touch-btn-aim {
+        right: 108px;
+        bottom: 155px;
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        font-size: 0.70rem;
+      }
+      #touch-btn-reload {
+        right: 24px;
+        bottom: 240px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        font-size: 0.68rem;
+      }
+      #touch-btn-use {
+        right: 88px;
+        bottom: 225px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        font-size: 0.65rem;
+        border: 2px solid #00ff41;
+        color: #00ff41;
+        background: rgba(0, 255, 65, 0.2);
+        box-shadow: 0 0 10px rgba(0, 255, 65, 0.35);
+      }
+      #touch-btn-sprint {
+        left: 20px;
+        top: 70px;
+        width: 56px;
+        height: 38px;
+        font-size: 0.65rem;
+      }
+      #touch-btn-crouch {
+        left: 84px;
+        top: 70px;
+        width: 56px;
+        height: 38px;
+        font-size: 0.65rem;
+      }
+      #touch-btn-flash {
+        left: 148px;
+        top: 70px;
+        width: 56px;
+        height: 38px;
+        font-size: 0.65rem;
+      }
+      #touch-weapon-bar {
+        position: absolute;
+        bottom: 78px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        pointer-events: auto;
+      }
+      .touch-wep-btn {
+        width: 48px;
+        height: 40px;
+        font-size: 0.72rem;
+      }
+      #touch-btn-tab {
+        right: 20px;
+        top: 15px;
+        width: 68px;
+        height: 34px;
+        font-size: 0.65rem;
+      }
+
+      /* ===== MODALES DE CONFIGURACIÓN Y RÉCORDS ===== */
+      #settings-modal, #leaderboard-modal {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at center, #06120a 0%, #000000 90%);
+        z-index: 110;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+      }
+      .settings-box {
+        background: rgba(0, 255, 65, 0.04);
+        border: 1px solid #00ff4160;
+        padding: 20px 28px;
+        width: 420px;
+        max-width: 90vw;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        text-align: left;
+      }
+      .setting-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        color: #00ff41cc;
+      }
+      .setting-row input[type="checkbox"] {
+        accent-color: #00ff41;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+      .leaderboard-table {
+        width: 540px;
+        max-width: 92vw;
+        border-collapse: collapse;
+        font-family: 'Courier New', monospace;
+        font-size: 0.80rem;
+        background: rgba(0, 255, 65, 0.03);
+        border: 1px solid #00ff4150;
+      }
+      .leaderboard-table th {
+        background: rgba(0, 255, 65, 0.15);
+        color: #00ff41;
+        padding: 8px;
+        text-align: center;
+        border-bottom: 1px solid #00ff4160;
+      }
+      .leaderboard-table td {
+        padding: 8px;
+        text-align: center;
+        border-bottom: 1px solid #00ff4125;
+        color: #ffffffdd;
+      }
+
+      /* ===== MODAL SELECCIÓN DE NIVEL ===== */
+      #level-select-modal {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at center, #06120a 0%, #000000 88%);
+        z-index: 105;
+        gap: 12px;
+        padding: 20px;
+        text-align: center;
+      }
+      .level-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 9px;
+        max-width: 940px;
+        max-height: 70vh;
+        overflow-y: auto;
+        padding-right: 4px;
+        width: 100%;
+        margin: 8px 0;
+      }
+      .level-card {
+        background: rgba(0, 255, 65, 0.05);
+        border: 1px solid #00ff4160;
+        color: #00ff41;
+        padding: 9px 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Courier New', monospace;
+      }
+      .level-card:hover:not(.locked) {
+        background: rgba(0, 255, 65, 0.22);
+        box-shadow: 0 0 16px #00ff4180;
+        transform: translateY(-2px);
+      }
+      .level-card.locked {
+        border-color: #223322 !important;
+        color: #445544 !important;
+        background: rgba(10, 20, 10, 0.45) !important;
+        cursor: not-allowed !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }
+      .level-card .lvl-num {
+        font-size: 1.15rem;
+        font-weight: bold;
+        letter-spacing: 0.1rem;
+      }
+      .level-card .lvl-status {
+        font-size: 0.55rem;
+        letter-spacing: 0.08rem;
+      }
+      .level-card .lvl-tag {
+        font-size: 0.50rem;
+        padding: 2px 4px;
+        border-radius: 2px;
+        margin-top: 2px;
+        text-transform: uppercase;
+      }
+      .tag-boss {
+        background: #ff220033;
+        color: #ff4400;
+        border: 1px solid #ff440066;
+      }
+      .tag-dog {
+        background: #dd880033;
+        color: #ffaa00;
+        border: 1px solid #ffaa0066;
+      }
+      .tag-mega {
+        background: #ff005544;
+        color: #ff2266;
+        border: 1px solid #ff005588;
+        animation: flicker 2s infinite;
+      }
+      .tag-irradiated {
+        background: #aa002244;
+        color: #ff3344;
+        border: 1px solid #ff003388;
+      }
+      .tag-normal {
+        color: #00ff4188;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-D7WI6dzR.js"></script>
+  </head>
+  <body>
+    <div id="app">
+
+      <!-- FILTRO ATMOSFÉRICO RETRO PS1 -->
+      <div id="ps1-dither-overlay"></div>
+
+      <!-- MONITOR TÁCTICO DE RENDIMIENTO (FPS Y RUMBO) -->
+      <div id="fps-counter">FPS: 60 | DIR: N 0°</div>
+
+      <!-- PANTALLA DE INICIO CON SELECCIÓN DE MODO -->
+      <div id="start-screen">
+        <div class="subtitle">// SISTEMA DE NAVEGACIÓN DINÁMICA //</div>
+        <h1>D.N.S.</h1>
+        <div class="subtitle">TACTICAL SIMULATION & COMBAT TESTBED</div>
+        
+        <div class="directive">
+          CLASIFICADO: NIVEL MILITAR ALFA &nbsp;|&nbsp; UNIDAD: ESPECTRO-7<br>
+          <span style="color:#ffffff;">ZONA: BÚNKER TÁCTICO CON REFUGIOS Y PUERTAS DESTRUIBLES (74×74m)</span><br>
+          ARSENAL: <span style="color:#00ff41">[1] PISTOLA 9MM &nbsp;|&nbsp; [2] AK-47 AUTO &nbsp;|&nbsp; [3] ESCOPETA 12G</span><br>
+          AMENAZAS: <span style="color:#ff3344;">INFECTADOS, PERROS DE 4 PATAS, IRRADIADOS ROJOS Y TITANES</span><br>
+          LOGÍSTICA: <span style="color:#ffcc00;">SALUD Y MUNICIÓN FINITA &nbsp;|&nbsp; ESCUDO DE KEVLAR Y BOTIQUINES</span>
+        </div>
+
+        <div class="mode-select-container">
+          <button id="btn-mode-horde" class="game-btn">
+            [ SELECCIONAR NIVEL DE HORDA ]
+            <span class="mode-badge">30 NIVELES PROGRESIVOS + JAURÍA CANINA</span>
+          </button>
+          
+          <button id="btn-mode-infinite" class="game-btn" style="border-color:#ff3344; color:#ff4455;">
+            [ MODO HORDA INFINITO ]
+            <span class="mode-badge" style="color:#ff6677;">SUPERVIVENCIA CONTINUA SIN FIN (TAB = TOP 10 RÉCORDS)</span>
+          </button>
+
+          <button id="btn-settings" class="game-btn" style="border-color:#22aaff; color:#22aaff;">
+            [ ⚙ CONFIGURACIÓN TÁCTICA ]
+            <span class="mode-badge" style="color:#66ccff;">FPS, FILTRO PS1 Y CONTROLES TÁCTILES</span>
+          </button>
+
+          <button id="btn-mode-story" class="game-btn mode-btn-disabled" disabled>
+            [ MODO HISTORIA: UMBRAL ]
+            <span class="mode-badge">[BLOQUEADO - EN DESARROLLO]</span>
+          </button>
+        </div>
+
+        <div id="controls-info">
+          WASD — MOVER &nbsp;|&nbsp; SHIFT — SPRINT &nbsp;|&nbsp; <span style="color:#ffffaa;">ESPACIO — SALTAR</span> &nbsp;|&nbsp; <span style="color:#ffffaa;">C — AGACHARSE</span><br>
+          <span style="color:#ffffaa;">CLIC DER — APUNTAR / ZOOM (ADS)</span> &nbsp;|&nbsp; CLIC IZQ — DISPARAR &nbsp;|&nbsp; R — RECARGAR &nbsp;|&nbsp; F — LINTERNA<br>
+          1, 2, 3 O RUEDA — CAMBIAR ARMA &nbsp;|&nbsp; <span style="color:#00ff41;">TAB — TOP 10 RÉCORDS INFINITOS</span>
+        </div>
+      </div>
+
+      <!-- MODAL DE SELECCIÓN DE NIVEL HORDA -->
+      <div id="level-select-modal">
+        <div class="subtitle" style="letter-spacing: 0.35rem; color: #00cc33;">// PROTOCOLO D.N.S. — SECTOR TÁCTICO //</div>
+        <h2 style="font-size: 2.1rem; letter-spacing: 0.45rem; color: #00ff41; text-shadow: 0 0 20px #00ff41; margin-bottom: 2px;">SELECCIÓN DE NIVEL HORDA (1 - 30)</h2>
+        <div class="directive" style="max-width: 760px; margin-bottom: 6px;">
+          RECURSOS FINITOS PERSISTENTES: CONSERVA LA SALUD, ESCUDO Y MUNICIÓN CON LA QUE SUPERAS CADA NIVEL.<br>
+          ELIGE CUALQUIER NIVEL DESBLOQUEADO PARA DESPLEGARTE DIRECTAMENTE.
+        </div>
+
+        <div id="level-grid" class="level-grid"></div>
+
+        <div style="margin-top: 12px;">
+          <button id="btn-level-back" class="pause-btn danger">[ VOLVER AL MENÚ ]</button>
+        </div>
+      </div>
+
+      <!-- CANVAS THREE.JS -->
+      <canvas id="game-canvas"></canvas>
+
+      <!-- VISOR HUD TÁCTICO -->
+      <div id="hud">
+        <div id="vignette"></div>
+        <div id="glitch-overlay"></div>
+
+        <!-- Marco visor -->
+        <div class="visor-corner tl"></div>
+        <div class="visor-corner tr"></div>
+        <div class="visor-corner bl"></div>
+        <div class="visor-corner br"></div>
+
+        <!-- Mirilla y Hitmarker -->
+        <div class="crosshair"></div>
+        <div id="hitmarker"></div>
+
+        <!-- INFO SUPERIOR -->
+        <div id="hud-top">
+          <div class="sys-id">SYS_ID: DNS-7 &nbsp;|&nbsp; UNIDAD: ESP-7</div>
+          <div class="objective" id="hud-objective">▶ MODO HORDA: OLEADA 1/30 ◀</div>
+          <div id="hud-subinfo">AMENAZAS ACTIVAS: 0</div>
+          <div id="hud-difficulty-phase" style="font-size:0.68rem; color:#ffcc00; letter-spacing:0.18rem; margin-top:3px; display:none;">FASE 1: INCURSIÓN BÁSICA</div>
+        </div>
+
+        <!-- BRÚJULA -->
+        <div id="compass">
+          <div class="compass-bar" id="compass-bar">N NE E SE S SO O NO</div>
+          <div class="compass-dir"><span id="compass-needle">N</span></div>
+        </div>
+
+        <!-- SELECTOR DE ARMAS EN HUD -->
+        <div id="weapon-selector">
+          <div class="weapon-slot active" id="slot-1">
+            <span class="slot-num">1</span>
+            <span class="slot-name">PISTOLA</span>
+          </div>
+          <div class="weapon-slot" id="slot-2">
+            <span class="slot-num">2</span>
+            <span class="slot-name">FUSIL</span>
+          </div>
+          <div class="weapon-slot" id="slot-3">
+            <span class="slot-num">3</span>
+            <span class="slot-name">ESCOPETA</span>
+          </div>
+        </div>
+
+        <!-- PANEL TÁCTICO INTEGRADO DE BIOMETRÍA Y ESTADO -->
+        <div id="operator-vitals-card">
+          <div class="vitals-header">// BIO-MÉTRICA OPERADOR //</div>
+          
+          <div class="vital-row">
+            <div class="vital-label-bar">
+              <span class="vital-name">INTEGRIDAD VITAL</span>
+              <span id="health-value">100% HP</span>
+            </div>
+            <div class="health-bar-container">
+              <div id="health-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="vital-row">
+            <div class="vital-label-bar">
+              <span class="vital-name" style="color:#22aaff;">ESCUDO DE KEVLAR</span>
+              <span id="shield-value" style="color:#22aaff;">🛡️ 25/50</span>
+            </div>
+            <div class="shield-bar-container">
+              <div id="shield-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="vitals-subgrid">
+            <div class="subgrid-item">POSTURA: <span id="move-mode">PIE</span></div>
+            <div class="subgrid-item">BAJAS: <span id="kill-count">0</span></div>
+            <div class="subgrid-item"><span id="flashlight-indicator" class="on">◉ LUZ: ON</span></div>
+          </div>
+        </div>
+
+        <!-- PROMPT DE INTERACCIÓN CON PUERTAS / REFUGIOS -->
+        <div id="door-prompt">[E] INTERACTUAR CON PUERTA</div>
+
+        <!-- PANEL MUNICIÓN -->
+        <div id="ammo-panel">
+          <div class="ammo-label">CARGADOR / RESERVA</div>
+          <div>
+            <span id="ammo-count">12</span>
+            <span id="ammo-reserve"> / 48</span>
+          </div>
+          <div class="ammo-mode" id="ammo-mode">9×19mm PARABELLUM</div>
+          <div id="reload-msg">⚠ RECARGANDO...</div>
+        </div>
+
+        <!-- ALERTA DISPARO / HIT CONFIRMATION -->
+        <div id="kill-alert">
+          <div class="alert-text" id="kill-alert-text">⚠ OBJETIVO ELIMINADO ⚠</div>
+        </div>
+      </div>
+
+      <!-- PAUSA -->
+      <div id="pause-screen">
+        <h2>// PAUSA //</h2>
+        <div class="pause-actions">
+          <button id="btn-resume" class="pause-btn">[ REANUDAR ]</button>
+          <button id="btn-pause-settings" class="pause-btn" style="border-color:#22aaff; color:#22aaff;">[ ⚙ CONFIGURACIÓN ]</button>
+          <button id="btn-restart" class="pause-btn">[ REINICIAR PARTIDA ]</button>
+          <button id="btn-home" class="pause-btn danger">[ VOLVER AL MENÚ ]</button>
+        </div>
+      </div>
+
+      <!-- MODAL DE CONFIGURACIÓN TÁCTICA -->
+      <div id="settings-modal">
+        <div class="subtitle" style="letter-spacing: 0.35rem; color: #22aaff;">// PROTOCOLO D.N.S. — PARÁMETROS DEL SISTEMA //</div>
+        <h2 style="font-size: 2.1rem; letter-spacing: 0.45rem; color: #22aaff; text-shadow: 0 0 20px #22aaff; margin-bottom: 4px;">CONFIGURACIÓN TÁCTICA</h2>
+        
+        <div class="settings-box">
+          <label class="setting-row">
+            <span>MOSTRAR CONTADOR DE FPS Y RUMBO:</span>
+            <input type="checkbox" id="setting-toggle-fps" checked />
+          </label>
+          <label class="setting-row">
+            <span>FILTRO RETRO PS1 (DITHER / SCANLINES):</span>
+            <input type="checkbox" id="setting-toggle-ps1" checked />
+          </label>
+          <label class="setting-row">
+            <span>CONTROLES TÁCTILES MÓVILES (PANTALLA):</span>
+            <input type="checkbox" id="setting-toggle-touch" />
+          </label>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <button id="btn-settings-close" class="pause-btn" style="border-color:#22aaff; color:#22aaff;">[ GUARDAR Y VOLVER ]</button>
+        </div>
+      </div>
+
+      <!-- MODAL TOP 10 RÉCORDS MODO INFINITO (TECLA TAB) -->
+      <div id="leaderboard-modal">
+        <div class="subtitle" style="letter-spacing: 0.35rem; color: #ffcc00;">// REGISTRO DE COMBATE HISTÓRICO //</div>
+        <h2 style="font-size: 2.1rem; letter-spacing: 0.45rem; color: #ffcc00; text-shadow: 0 0 20px #ffcc00; margin-bottom: 4px;">TOP 10 SUPERVIVENCIA INFINITA</h2>
+        <div class="directive" style="max-width: 580px; margin-bottom: 6px; color:#ffcc00bb; border-color:#ffaa0044;">
+          LOS MEJORES TIEMPOS DE OPERACIÓN REGISTRADOS EN ESTA TERMINAL.<br>
+          PULSA <span style="color:#ffffff;">TAB</span> O CIERRA ESTA VENTANA PARA VOLVER AL COMBATE.
+        </div>
+
+        <div id="leaderboard-table-container">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th>RANGO</th>
+                <th>TIEMPO SUPERVIVENCIA</th>
+                <th>BAJAS</th>
+                <th>FECHA</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-rows">
+              <!-- Rellenado dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <button id="btn-leaderboard-close" class="pause-btn" style="border-color:#ffcc00; color:#ffcc00;">[ CERRAR REGISTRO (TAB) ]</button>
+        </div>
+      </div>
+
+      <!-- CONTROLES TÁCTILES MÓVILES EN PANTALLA -->
+      <div id="touch-controls">
+        <div id="touch-zone-move">
+          <div id="touch-joystick-base">
+            <div id="touch-joystick-knob"></div>
+          </div>
+        </div>
+        <div id="touch-zone-look">
+          <button id="touch-btn-fire" class="touch-btn">FUEGO</button>
+          <button id="touch-btn-aim" class="touch-btn">ZOOM</button>
+          <button id="touch-btn-reload" class="touch-btn">RECARGA</button>
+          <button id="touch-btn-use" class="touch-btn">[E] USAR</button>
+        </div>
+
+        <button id="touch-btn-sprint" class="touch-btn">CORRER</button>
+        <button id="touch-btn-crouch" class="touch-btn">AGACH</button>
+        <button id="touch-btn-flash" class="touch-btn">LUZ</button>
+        <button id="touch-btn-tab" class="touch-btn">TOP 10</button>
+
+        <div id="touch-weapon-bar">
+          <button id="touch-btn-wep1" class="touch-btn touch-wep-btn">1:9MM</button>
+          <button id="touch-btn-wep2" class="touch-btn touch-wep-btn">2:AK</button>
+          <button id="touch-btn-wep3" class="touch-btn touch-wep-btn">3:12G</button>
+        </div>
+      </div>
+
+      <!-- MODAL ENTRE OLEADAS CON ESTADÍSTICAS DETALLADAS -->
+      <div id="wave-modal">
+        <h2 id="wave-modal-title" style="color: #00ff41; text-shadow: 0 0 25px #00ff41;">// OLEADA 1 SUPERADA //</h2>
+        
+        <!-- REPORTE TÁCTICO DE COMBATE -->
+        <div id="wave-stats-box">
+          <div class="stats-title">// REPORTE TÁCTICO DE COMBATE //</div>
+          <div class="stats-grid">
+            <div class="stat-item"><span class="stat-lbl">TIEMPO OLEADA:</span> <span id="stat-time" class="stat-val">00:00</span></div>
+            <div class="stat-item"><span class="stat-lbl">PRECISIÓN TIRO:</span> <span id="stat-accuracy" class="stat-val">0%</span></div>
+            <div class="stat-item"><span class="stat-lbl">HEADSHOTS:</span> <span id="stat-headshots" class="stat-val">0 (0%)</span></div>
+            <div class="stat-item"><span class="stat-lbl">ELIMINACIONES:</span> <span id="stat-kills" class="stat-val">0</span></div>
+            <div class="stat-item"><span class="stat-lbl">DAÑO INFLIGIDO:</span> <span id="stat-damage-dealt" class="stat-val">0</span></div>
+            <div class="stat-item"><span class="stat-lbl">SALUD RESTANTE:</span> <span id="stat-health-left" class="stat-val">100%</span></div>
+          </div>
+        </div>
+
+        <div class="pause-actions">
+          <button id="btn-next-wave" class="pause-btn">[ DESPLEGAR SIGUIENTE OLEADA ]</button>
+          <button id="btn-wave-home" class="pause-btn danger">[ VOLVER AL MENÚ ]</button>
+        </div>
+      </div>
+
+      <!-- GAME OVER / SOLDADO CAÍDO -->
+      <div id="gameover-modal">
+        <h2 style="color: #ff2200; text-shadow: 0 0 25px #ff2200;">// SOLDADO CAÍDO //</h2>
+        <p style="color: #ff3300bb; font-size: 0.85rem; line-height: 2; max-width: 500px;">
+          Constantes vitales perdidas. El parásito y las aberraciones te han abrumado.<br>
+          Misión abortada por falla crítica.
+        </p>
+        <div id="infinite-stats-summary" style="display: none; color: #ffcc00; font-size: 0.9rem; line-height: 1.9; border: 1px solid #ffaa0055; padding: 10px 18px; background: rgba(255, 170, 0, 0.06); max-width: 440px; margin-top: 6px;"></div>
+        <div class="pause-actions">
+          <button id="btn-retry-horde" class="pause-btn">[ REINTENTAR PARTIDA ]</button>
+          <button id="btn-gameover-home" class="pause-btn danger">[ MENÚ PRINCIPAL ]</button>
+        </div>
+      </div>
+
+    </div>
+
+  </body>
+</html>
